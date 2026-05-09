@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>In Silico Drug Design — Molecular Docking, ADMET & AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #050d1a;
+    --surface: #0a1628;
+    --card: #0f1f38;
+    --border: #1a3560;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --warn: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Outfit', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+  }
+
+  /* ── STARFIELD ── */
+  #starfield {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(5,13,26,0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 60px;
+  }
+  .nav-logo {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+  .nav-links { display: flex; gap: 1.5rem; list-style: none; }
+  .nav-links a {
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-decoration: none;
+    font-family: var(--mono);
+    transition: color 0.2s;
+    letter-spacing: 0.03em;
+  }
+  .nav-links a:hover { color: var(--accent); }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative; z-index: 1;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+    padding: 6rem 2rem 4rem;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.25);
+    border-radius: 999px;
+    padding: 0.35rem 1rem;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    margin-bottom: 2rem;
+    animation: fadeUp 0.6s ease both;
+  }
+  .hero-badge::before { content: '◉'; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .hero h1 {
+    font-size: clamp(2.2rem, 6vw, 5rem);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin-bottom: 1.5rem;
+    animation: fadeUp 0.6s 0.1s ease both;
+  }
+  .hero h1 span { color: var(--accent); }
+  .hero h1 em { color: var(--accent2); font-style: normal; }
+
+  .hero-sub {
+    max-width: 600px;
+    font-size: 1.05rem;
+    color: var(--muted);
+    line-height: 1.7;
+    margin-bottom: 2.5rem;
+    animation: fadeUp 0.6s 0.2s ease both;
+  }
+
+  .hero-pills {
+    display: flex; flex-wrap: wrap; gap: 0.6rem;
+    justify-content: center;
+    animation: fadeUp 0.6s 0.3s ease both;
+    margin-bottom: 3rem;
+  }
+  .pill {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.4rem 1rem;
+    font-size: 0.78rem;
+    font-family: var(--mono);
+    color: var(--text);
+  }
+
+  .hero-scroll {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    animation: fadeUp 0.6s 0.5s ease both, bounce 2s 1.5s infinite;
+  }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(6px)} }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ── MOLECULE CANVAS ── */
+  #mol-canvas {
+    position: absolute;
+    top: 50%; right: 6%;
+    transform: translateY(-50%);
+    width: min(380px, 38vw);
+    height: min(380px, 38vw);
+    opacity: 0.9;
+  }
+  @media(max-width:768px){ #mol-canvas { display: none; } }
+
+  /* ── SECTIONS ── */
+  section {
+    position: relative; z-index: 1;
+    padding: 5rem 2rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .section-label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+  }
+  .section-title {
+    font-size: clamp(1.6rem, 3.5vw, 2.6rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 1rem;
+  }
+  .section-desc {
+    color: var(--muted);
+    max-width: 600px;
+    line-height: 1.7;
+    margin-bottom: 3rem;
+    font-size: 0.95rem;
+  }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.8rem;
+    transition: border-color 0.3s, transform 0.3s;
+  }
+  .card:hover {
+    border-color: var(--accent);
+    transform: translateY(-3px);
+  }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(300px,1fr)); gap: 1.5rem; }
+
+  /* ── DOCKING TOOL ── */
+  .tool-wrapper {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+  }
+  .tool-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 1.5rem;
+    display: flex; align-items: center; gap: 0.6rem;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .dot { width:10px; height:10px; border-radius:50%; }
+  .dot-r{background:#ff5f57;} .dot-y{background:#febc2e;} .dot-g{background:#28c840;}
+
+  .tool-body { padding: 1.8rem; }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  @media(max-width:600px){ .form-row { grid-template-columns: 1fr; } }
+
+  label { font-size: 0.75rem; font-family: var(--mono); color: var(--muted); display: block; margin-bottom: 0.4rem; letter-spacing: 0.05em; }
+  select, input[type=text], input[type=range] {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    padding: 0.65rem 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+  select:focus, input:focus { border-color: var(--accent); }
+  select option { background: var(--card); }
+
+  input[type=range] {
+    padding: 0;
+    cursor: pointer;
+    accent-color: var(--accent);
+    height: 4px;
+    border: none;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    background: var(--accent);
+    color: var(--bg);
+    border: none; border-radius: 10px;
+    padding: 0.75rem 1.6rem;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+    letter-spacing: 0.03em;
+  }
+  .btn:hover { opacity: 0.85; transform: scale(1.02); }
+  .btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+  .btn-purple { background: var(--accent2); color: #fff; }
+  .btn-green { background: var(--accent3); color: #fff; }
+
+  /* result panel */
+  .result-panel {
+    margin-top: 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.2rem 1.5rem;
+    display: none;
+  }
+  .result-panel.show { display: block; animation: fadeUp 0.4s ease; }
+  .result-title { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); letter-spacing: 0.1em; margin-bottom: 1rem; }
+  .metric-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; }
+  .metric-label { font-size: 0.82rem; color: var(--muted); }
+  .metric-value { font-family: var(--mono); font-size: 0.88rem; font-weight: 700; }
+  .good { color: var(--accent3); }
+  .ok   { color: var(--warn); }
+  .bad  { color: #f87171; }
+
+  .score-bar-wrap { margin: 1rem 0; }
+  .score-bar-bg { background: var(--border); border-radius: 999px; height: 6px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 999px; transition: width 1s ease; }
+
+  /* ── ADMET ── */
+  .admet-grid {
+    display: grid; grid-template-columns: repeat(auto-fill,minmax(160px,1fr)); gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .admet-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    text-align: center;
+  }
+  .admet-icon { font-size: 1.8rem; margin-bottom: 0.4rem; }
+  .admet-name { font-family: var(--mono); font-size: 0.65rem; color: var(--muted); letter-spacing: 0.08em; margin-bottom: 0.3rem; }
+  .admet-val { font-weight: 700; font-size: 0.95rem; }
+
+  /* ── AI CHAT ── */
+  .chat-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+  }
+  .chat-messages {
+    min-height: 260px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 1.5rem;
+    display: flex; flex-direction: column; gap: 1rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .msg {
+    display: flex; gap: 0.8rem; align-items: flex-start;
+    animation: fadeUp 0.3s ease;
+  }
+  .msg-avatar {
+    width: 32px; height: 32px; flex-shrink: 0;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+  .msg-avatar.user { background: rgba(124,58,237,0.25); color: var(--accent2); border: 1px solid rgba(124,58,237,0.3); }
+  .msg-avatar.ai   { background: rgba(0,212,255,0.15); color: var(--accent); border: 1px solid rgba(0,212,255,0.25); }
+  .msg-bubble {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    font-size: 0.88rem;
+    line-height: 1.65;
+    max-width: 85%;
+    white-space: pre-wrap;
+  }
+  .msg-bubble.ai-bubble { border-color: rgba(0,212,255,0.2); }
+
+  .chat-input-row {
+    display: flex; gap: 0.7rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .chat-input {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 0.88rem;
+    padding: 0.65rem 1rem;
+    outline: none;
+    resize: none;
+    line-height: 1.5;
+  }
+  .chat-input:focus { border-color: var(--accent); }
+
+  /* typing indicator */
+  .typing { display: flex; gap: 4px; align-items: center; padding: 0.6rem; }
+  .typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); opacity: 0.4; animation: blink 1.2s infinite; }
+  .typing span:nth-child(2){ animation-delay:0.2s; }
+  .typing span:nth-child(3){ animation-delay:0.4s; }
+  @keyframes blink { 0%,80%,100%{opacity:0.4} 40%{opacity:1} }
+
+  /* ── PIPELINE DIAGRAM ── */
+  .pipeline {
+    display: flex; align-items: flex-start; gap: 0;
+    overflow-x: auto; padding-bottom: 1rem;
+  }
+  .pipe-step {
+    flex: 1; min-width: 130px;
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center;
+  }
+  .pipe-icon {
+    width: 56px; height: 56px;
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem;
+    margin-bottom: 0.7rem;
+    border: 1px solid var(--border);
+    position: relative;
+    z-index: 1;
+  }
+  .pipe-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    /* handled via JS connector */
+  }
+  .pipe-connector {
+    flex: 0 0 30px;
+    height: 56px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--border);
+    font-size: 1.2rem;
+    padding-top: 0;
+  }
+  .pipe-name { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); letter-spacing: 0.05em; line-height: 1.4; }
+
+  /* ── CONCEPTS ── */
+  .concept-icon { font-size: 2rem; margin-bottom: 0.8rem; }
+  .card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .card p { font-size: 0.85rem; color: var(--muted); line-height: 1.6; }
+
+  /* ── FOOTER ── */
+  footer {
+    position: relative; z-index: 1;
+    border-top: 1px solid var(--border);
+    padding: 2rem;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  /* ── GLOW ── */
+  .glow-blob {
+    position: fixed; pointer-events: none; z-index: 0;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.18;
+  }
+
+  /* loader spinner */
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── SCROLL REVEAL ── */
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .reveal.visible { opacity: 1; transform: none; }
+
+  /* warning box */
+  .warn-box {
+    background: rgba(245,158,11,0.08);
+    border: 1px solid rgba(245,158,11,0.3);
+    border-radius: 10px;
+    padding: 0.7rem 1rem;
+    font-size: 0.78rem;
+    color: var(--warn);
+    font-family: var(--mono);
+    margin-bottom: 1rem;
+  }
+
+  /* range value display */
+  .range-row { display: flex; align-items: center; gap: 0.8rem; }
+  .range-val { font-family: var(--mono); font-size: 0.8rem; color: var(--accent); min-width: 40px; text-align: right; }
+</style>
+</head>
+<body>
+
+<!-- background blobs -->
+<div class="glow-blob" style="width:600px;height:600px;background:#00d4ff;top:-100px;left:-150px;"></div>
+<div class="glow-blob" style="width:500px;height:500px;background:#7c3aed;bottom:-100px;right:-100px;"></div>
+
+<canvas id="starfield"></canvas>
+
+<nav>
+  <span class="nav-logo">// IN SILICO DRUG DESIGN</span>
+  <ul class="nav-links">
+    <li><a href="#concepts">Concepts</a></li>
+    <li><a href="#docking">Docking</a></li>
+    <li><a href="#admet">ADMET</a></li>
+    <li><a href="#ai">AI Assistant</a></li>
+    <li><a href="#pipeline">Pipeline</a></li>
+  </ul>
+</nav>
+
+<!-- ═══════════ HERO ═══════════ -->
+<div class="hero">
+  <div class="hero-badge">COMPUTATIONAL CHEMISTRY PROJECT</div>
+  <h1>
+    <span>In Silico</span> Drug Design<br/>
+    <em>Molecular Docking,</em> ADMET & AI
+  </h1>
+  <p class="hero-sub">
+    Discover how modern drug discovery happens inside computers — from predicting how molecules bind to proteins, to filtering candidates with AI-powered ADMET analysis.
+  </p>
+  <div class="hero-pills">
+    <span class="pill">Molecular Docking</span>
+    <span class="pill">ADMET Prediction</span>
+    <span class="pill">Virtual Screening</span>
+    <span class="pill">AI / Deep Learning</span>
+    <span class="pill">Structure-Based Design</span>
+  </div>
+  <div class="hero-scroll">↓ SCROLL TO EXPLORE</div>
+  <canvas id="mol-canvas"></canvas>
+</div>
+
+<!-- ═══════════ CONCEPTS ═══════════ -->
+<section id="concepts">
+  <div class="section-label reveal">FUNDAMENTALS</div>
+  <h2 class="section-title reveal">Core Concepts</h2>
+  <p class="section-desc reveal">Before a drug reaches a patient, thousands of molecules are tested virtually. Here's what makes that possible.</p>
+  <div class="card-grid">
+    <div class="card reveal">
+      <div class="concept-icon">🔬</div>
+      <h3>What is In Silico Drug Design?</h3>
+      <p>Using computers to predict, design, and optimize drug candidates before any lab work begins — saving years and billions of dollars in early-stage research.</p>
+    </div>
+    <div class="card reveal">
+      <div class="concept-icon">🧲</div>
+      <h3>Molecular Docking</h3>
+      <p>A computational method that predicts the preferred orientation of a drug molecule (ligand) when it binds to a protein target. Lower binding energy = stronger interaction.</p>
+    </div>
+    <div class="card reveal">
+      <div class="concept-icon">⚡</div>
+      <h3>Binding Free Energy</h3>
+      <p>The thermodynamic measure (kcal/mol) of how strongly a drug binds. Calculated from electrostatic, van der Waals, and hydrogen-bond interactions at the active site.</p>
+    </div>
+    <div class="card reveal">
+      <div class="concept-icon">🧪</div>
+      <h3>ADMET Properties</h3>
+      <p><b>A</b>bsorption · <b>D</b>istribution · <b>M</b>etabolism · <b>E</b>xcretion · <b>T</b>oxicity — five critical filters every drug candidate must pass before clinical trials.</p>
+    </div>
+    <div class="card reveal">
+      <div class="concept-icon">🤖</div>
+      <h3>AI & Machine Learning</h3>
+      <p>Deep learning models (GNNs, Transformers) trained on millions of known drug–target interactions can predict binding affinity and ADMET profiles in milliseconds.</p>
+    </div>
+    <div class="card reveal">
+      <div class="concept-icon">💊</div>
+      <h3>Lipinski's Rule of Five</h3>
+      <p>A drug-likeness filter: MW ≤ 500 Da, logP ≤ 5, H-bond donors ≤ 5, H-bond acceptors ≤ 10. Molecules that violate ≥ 2 rules often have poor oral bioavailability.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ DOCKING SIMULATOR ═══════════ -->
+<section id="docking">
+  <div class="section-label reveal">INTERACTIVE TOOL</div>
+  <h2 class="section-title reveal">Molecular Docking Simulator</h2>
+  <p class="section-desc reveal">Select a drug candidate and protein target. The simulator estimates binding affinity, interaction pose, and druglikeness score.</p>
+
+  <div class="tool-wrapper reveal">
+    <div class="tool-header">
+      <div class="dot dot-r"></div>
+      <div class="dot dot-y"></div>
+      <div class="dot dot-g"></div>
+      <span style="margin-left:0.5rem;">docking_simulator.py — AutoDock Vina (simulated)</span>
+    </div>
+    <div class="tool-body">
+      <div class="form-row">
+        <div>
+          <label>DRUG CANDIDATE (LIGAND)</label>
+          <select id="ligand-select">
+            <option value="aspirin">Aspirin (C₉H₈O₄)</option>
+            <option value="ibuprofen">Ibuprofen (C₁₃H₁₈O₂)</option>
+            <option value="caffeine">Caffeine (C₈H₁₀N₄O₂)</option>
+            <option value="oseltamivir">Oseltamivir (Tamiflu)</option>
+            <option value="remdesivir">Remdesivir</option>
+            <option value="lopinavir">Lopinavir (HIV protease inhibitor)</option>
+            <option value="metformin">Metformin</option>
+          </select>
+        </div>
+        <div>
+          <label>TARGET PROTEIN (RECEPTOR)</label>
+          <select id="receptor-select">
+            <option value="cox2">COX-2 (Cyclooxygenase-2)</option>
+            <option value="ace2">ACE2 (SARS-CoV-2 receptor)</option>
+            <option value="hivp">HIV-1 Protease</option>
+            <option value="egfr">EGFR (Lung cancer)</option>
+            <option value="ada2">Adenosine A2A Receptor</option>
+            <option value="dpp4">DPP-4 (Diabetes target)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label>GRID BOX SIZE (Å)</label>
+          <div class="range-row">
+            <input type="range" id="grid-size" min="10" max="30" value="20" oninput="document.getElementById('gv').textContent=this.value+'Å'"/>
+            <span class="range-val" id="gv">20Å</span>
+          </div>
+        </div>
+        <div>
+          <label>EXHAUSTIVENESS</label>
+          <div class="range-row">
+            <input type="range" id="exhaust" min="1" max="16" value="8" oninput="document.getElementById('ev').textContent=this.value"/>
+            <span class="range-val" id="ev">8</span>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn" id="dock-btn" onclick="runDocking()">
+        ▶ Run Docking
+      </button>
+
+      <div class="result-panel" id="dock-result">
+        <div class="result-title">// DOCKING RESULTS — AutoDock Vina (simulated)</div>
+        <div id="dock-metrics"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ ADMET ═══════════ -->
+<section id="admet">
+  <div class="section-label reveal">DRUG FILTERING</div>
+  <h2 class="section-title reveal">ADMET Predictor</h2>
+  <p class="section-desc reveal">Enter a molecule name below and our AI will analyze its Absorption, Distribution, Metabolism, Excretion, and Toxicity profile.</p>
+
+  <div class="tool-wrapper reveal">
+    <div class="tool-header">
+      <div class="dot dot-r"></div>
+      <div class="dot dot-y"></div>
+      <div class="dot dot-g"></div>
+      <span style="margin-left:0.5rem;">admet_predictor.py — powered by Claude AI</span>
+    </div>
+    <div class="tool-body">
+      <div class="warn-box">⚠ AI-generated predictions for educational purposes only. Not for clinical use.</div>
+      <div style="display:flex;gap:0.8rem;flex-wrap:wrap;align-items:flex-end;">
+        <div style="flex:1;min-width:220px;">
+          <label>MOLECULE / DRUG NAME</label>
+          <input type="text" id="admet-input" placeholder="e.g. Aspirin, Ibuprofen, Caffeine..." onkeydown="if(event.key==='Enter')runADMET()"/>
+        </div>
+        <button class="btn btn-purple" id="admet-btn" onclick="runADMET()">
+          🔍 Predict ADMET
+        </button>
+      </div>
+      <div id="admet-result" class="result-panel">
+        <div class="result-title">// ADMET ANALYSIS</div>
+        <div class="admet-grid" id="admet-cards"></div>
+        <div id="admet-summary" style="margin-top:1.2rem;font-size:0.85rem;color:var(--muted);line-height:1.7;"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ AI ASSISTANT ═══════════ -->
+<section id="ai">
+  <div class="section-label reveal">AI INTEGRATION</div>
+  <h2 class="section-title reveal">Drug Design AI Assistant</h2>
+  <p class="section-desc reveal">Ask anything about computational drug design — molecular docking, force fields, SMILES notation, or specific drugs. Powered by Claude.</p>
+
+  <div class="chat-wrap reveal">
+    <div class="chat-messages" id="chat-messages">
+      <div class="msg">
+        <div class="msg-avatar ai">AI</div>
+        <div class="msg-bubble ai-bubble">
+          Hello! 👋 I'm your computational drug design assistant. I can help you understand:
+          • Molecular docking protocols &amp; scoring functions
+          • ADMET property prediction
+          • Virtual screening workflows
+          • AI/ML in drug discovery (GNNs, Transformers, AlphaFold)
+          • Lipinski's Rule of Five &amp; drug-likeness filters
+          
+          What would you like to explore?
+        </div>
+      </div>
+    </div>
+    <div class="chat-input-row">
+      <textarea class="chat-input" id="chat-input" rows="1" placeholder="Ask about drug design, docking, ADMET..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+      <button class="btn" id="chat-btn" onclick="sendChat()">Send →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ PIPELINE ═══════════ -->
+<section id="pipeline">
+  <div class="section-label reveal">WORKFLOW</div>
+  <h2 class="section-title reveal">Drug Discovery Pipeline</h2>
+  <p class="section-desc reveal">From target identification to lead optimization — the modern computational drug discovery workflow.</p>
+
+  <div class="card reveal" style="padding:2.5rem;">
+    <div class="pipeline" id="pipeline-steps">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
+  <div class="card-grid" style="margin-top:2rem;">
+    <div class="card reveal">
+      <h3>🎯 Traditional Drug Discovery</h3>
+      <p>Takes 10–15 years and $2+ billion per drug. High failure rate (>90% of candidates fail in clinical trials).</p>
+    </div>
+    <div class="card reveal">
+      <h3>⚡ In Silico Acceleration</h3>
+      <p>Computational methods screen millions of virtual compounds in days, reducing wet-lab experiments by 60–80% in early stages.</p>
+    </div>
+    <div class="card reveal">
+      <h3>🤖 AI Revolution (2020s)</h3>
+      <p>Models like AlphaFold2 solved the protein folding problem. Graph Neural Networks predict binding with near-experimental accuracy.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div style="margin-bottom:0.4rem;">Built with ❤️ for Computational Chemistry — First Year Project</div>
+  <div>Topic: In Silico Drug Design · Molecular Docking · ADMET · AI</div>
+</footer>
+
+<script>
+// ═══════════════════════════════════════
+// STARFIELD
+// ═══════════════════════════════════════
+(function(){
+  const c = document.getElementById('starfield');
+  const ctx = c.getContext('2d');
+  let W, H, stars = [];
+  function resize(){ W=c.width=window.innerWidth; H=c.height=window.innerHeight; }
+  function init(){
+    resize();
+    stars = Array.from({length:120},()=>({
+      x:Math.random()*W, y:Math.random()*H,
+      r:Math.random()*1.2+0.2,
+      o:Math.random()*0.6+0.1,
+      s:Math.random()*0.3+0.05
+    }));
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    stars.forEach(s=>{
+      ctx.beginPath();
+      ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(200,220,255,${s.o})`;
+      ctx.fill();
+      s.y-=s.s;
+      if(s.y<-2){s.y=H+2;s.x=Math.random()*W;}
+    });
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize',init);
+  init(); draw();
+})();
+
+// ═══════════════════════════════════════
+// MOLECULE CANVAS (3D rotating)
+// ═══════════════════════════════════════
+(function(){
+  const c = document.getElementById('mol-canvas');
+  if(!c) return;
+  const ctx = c.getContext('2d');
+  const W = c.width = c.offsetWidth;
+  const H = c.height = c.offsetHeight;
+  const cx = W/2, cy = H/2;
+  let angle = 0;
+
+  // Benzene ring + substituents approximating aspirin
+  const atoms = [
+    // benzene ring
+    {r:0.45,a:0,label:'C',color:'#60a5fa'},
+    {r:0.45,a:60,label:'C',color:'#60a5fa'},
+    {r:0.45,a:120,label:'C',color:'#60a5fa'},
+    {r:0.45,a:180,label:'C',color:'#60a5fa'},
+    {r:0.45,a:240,label:'C',color:'#60a5fa'},
+    {r:0.45,a:300,label:'C',color:'#60a5fa'},
+    // OH group
+    {r:0.72,a:30,label:'O',color:'#f87171'},
+    {r:0.95,a:15,label:'H',color:'#94a3b8'},
+    // COOH
+    {r:0.72,a:330,label:'C',color:'#60a5fa'},
+    {r:0.95,a:345,label:'O',color:'#f87171'},
+    {r:0.95,a:315,label:'O',color:'#f87171'},
+  ];
+  const bonds = [
+    [0,1],[1,2],[2,3],[3,4],[4,5],[5,0], // ring
+    [0,6],[6,7], // OH
+    [5,8],[8,9],[8,10] // COOH
+  ];
+
+  const R = Math.min(W,H)*0.35;
+
+  function project(atom, t){
+    const rad = (atom.a + t) * Math.PI/180;
+    const x = cx + atom.r * R * Math.cos(rad);
+    const y = cy + atom.r * R * Math.sin(rad) * 0.55;
+    return {x, y};
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    const t = angle;
+
+    // bonds
+    bonds.forEach(([i,j])=>{
+      const p1 = project(atoms[i],t);
+      const p2 = project(atoms[j],t);
+      ctx.beginPath();
+      ctx.moveTo(p1.x,p1.y);
+      ctx.lineTo(p2.x,p2.y);
+      ctx.strokeStyle='rgba(100,148,220,0.5)';
+      ctx.lineWidth=1.5;
+      ctx.stroke();
+    });
+
+    // atoms
+    atoms.forEach(atom=>{
+      const p = project(atom,t);
+      const isH = atom.label==='H';
+      const rad = isH ? 5 : 9;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,rad,0,Math.PI*2);
+      ctx.fillStyle=atom.color+'33';
+      ctx.fill();
+      ctx.strokeStyle=atom.color;
+      ctx.lineWidth=1.5;
+      ctx.stroke();
+      if(!isH){
+        ctx.fillStyle=atom.color;
+        ctx.font='bold 8px Space Mono, monospace';
+        ctx.textAlign='center';
+        ctx.textBaseline='middle';
+        ctx.fillText(atom.label,p.x,p.y);
+      }
+    });
+
+    // label
+    ctx.fillStyle='rgba(0,212,255,0.5)';
+    ctx.font='11px Space Mono, monospace';
+    ctx.textAlign='center';
+    ctx.fillText('Aspirin — C₉H₈O₄',cx,H-16);
+
+    angle += 0.4;
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ═══════════════════════════════════════
+// SCROLL REVEAL
+// ═══════════════════════════════════════
+const observer = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('visible'); });
+},{threshold:0.12});
+document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+
+// ═══════════════════════════════════════
+// PIPELINE STEPS
+// ═══════════════════════════════════════
+const steps = [
+  {icon:'🎯',bg:'rgba(239,68,68,0.15)',name:'Target\nIdentification'},
+  {icon:'🗃️',bg:'rgba(245,158,11,0.15)',name:'Library\nPreparation'},
+  {icon:'🔍',bg:'rgba(16,185,129,0.15)',name:'Virtual\nScreening'},
+  {icon:'🧲',bg:'rgba(0,212,255,0.15)',name:'Molecular\nDocking'},
+  {icon:'📊',bg:'rgba(124,58,237,0.15)',name:'ADMET\nFiltering'},
+  {icon:'⚗️',bg:'rgba(239,68,68,0.15)',name:'Lead\nOptimization'},
+  {icon:'🧬',bg:'rgba(245,158,11,0.15)',name:'Preclinical\nTests'},
+  {icon:'💊',bg:'rgba(16,185,129,0.15)',name:'Clinical\nTrials'},
+];
+const pw = document.getElementById('pipeline-steps');
+steps.forEach((s,i)=>{
+  const el = document.createElement('div');
+  el.className='pipe-step';
+  el.innerHTML=`<div class="pipe-icon" style="background:${s.bg}">${s.icon}</div><div class="pipe-name">${s.name}</div>`;
+  pw.appendChild(el);
+  if(i<steps.length-1){
+    const arr=document.createElement('div');
+    arr.className='pipe-connector';
+    arr.textContent='→';
+    pw.appendChild(arr);
+  }
+});
+
+// ═══════════════════════════════════════
+// DOCKING SIMULATOR
+// ═══════════════════════════════════════
+const dockingData = {
+  aspirin:   { cox2:{score:-7.2,hb:3,vdw:-18.4,elec:-3.1,lip:true},  ace2:{score:-4.1,hb:1,vdw:-10.2,elec:-1.8,lip:true},  hivp:{score:-3.8,hb:0,vdw:-9.1,elec:-1.2,lip:true},  egfr:{score:-4.5,hb:2,vdw:-11.3,elec:-2.0,lip:true},  ada2:{score:-5.1,hb:2,vdw:-13.0,elec:-2.5,lip:true},  dpp4:{score:-5.5,hb:2,vdw:-14.2,elec:-2.7,lip:true} },
+  ibuprofen: { cox2:{score:-8.1,hb:1,vdw:-22.1,elec:-2.3,lip:true},  ace2:{score:-5.2,hb:1,vdw:-14.1,elec:-1.5,lip:true},  hivp:{score:-4.9,hb:1,vdw:-12.8,elec:-1.1,lip:true},  egfr:{score:-5.6,hb:1,vdw:-15.0,elec:-1.9,lip:true},  ada2:{score:-6.2,hb:2,vdw:-16.5,elec:-2.0,lip:true},  dpp4:{score:-6.8,hb:2,vdw:-18.3,elec:-2.2,lip:true} },
+  caffeine:  { cox2:{score:-5.5,hb:2,vdw:-14.2,elec:-4.1,lip:true},  ace2:{score:-5.9,hb:3,vdw:-15.0,elec:-4.5,lip:true},  hivp:{score:-4.2,hb:1,vdw:-11.0,elec:-2.8,lip:true},  egfr:{score:-5.0,hb:2,vdw:-13.1,elec:-3.5,lip:true},  ada2:{score:-7.3,hb:4,vdw:-19.2,elec:-5.0,lip:true},  dpp4:{score:-5.8,hb:2,vdw:-15.5,elec:-3.9,lip:true} },
+  oseltamivir:{cox2:{score:-4.8,hb:2,vdw:-12.0,elec:-3.2,lip:true}, ace2:{score:-8.4,hb:6,vdw:-24.2,elec:-5.8,lip:true},  hivp:{score:-5.5,hb:3,vdw:-14.5,elec:-4.1,lip:true},  egfr:{score:-5.2,hb:3,vdw:-13.8,elec:-3.8,lip:true},  ada2:{score:-4.9,hb:2,vdw:-12.5,elec:-3.0,lip:true},  dpp4:{score:-6.1,hb:4,vdw:-16.2,elec:-4.4,lip:true} },
+  remdesivir:{cox2:{score:-5.2,hb:3,vdw:-13.5,elec:-4.0,lip:false}, ace2:{score:-9.1,hb:7,vdw:-26.5,elec:-6.4,lip:false}, hivp:{score:-7.2,hb:5,vdw:-21.0,elec:-5.5,lip:false}, egfr:{score:-6.8,hb:4,vdw:-19.5,elec:-5.1,lip:false}, ada2:{score:-5.5,hb:3,vdw:-15.0,elec:-4.2,lip:false}, dpp4:{score:-7.0,hb:5,vdw:-20.2,elec:-5.3,lip:false} },
+  lopinavir: { cox2:{score:-5.0,hb:2,vdw:-18.0,elec:-3.5,lip:false}, ace2:{score:-7.8,hb:5,vdw:-28.0,elec:-5.2,lip:false}, hivp:{score:-10.5,hb:6,vdw:-35.2,elec:-7.1,lip:false},egfr:{score:-6.5,hb:3,vdw:-22.5,elec:-4.8,lip:false}, ada2:{score:-5.8,hb:3,vdw:-19.5,elec:-4.0,lip:false}, dpp4:{score:-7.5,hb:4,vdw:-25.0,elec:-5.5,lip:false} },
+  metformin: { cox2:{score:-3.5,hb:4,vdw:-8.5,elec:-5.2,lip:true},   ace2:{score:-3.2,hb:3,vdw:-7.8,elec:-4.8,lip:true},  hivp:{score:-2.9,hb:2,vdw:-6.5,elec:-4.2,lip:true},  egfr:{score:-3.8,hb:4,vdw:-9.0,elec:-5.5,lip:true},  ada2:{score:-3.1,hb:3,vdw:-7.2,elec:-4.5,lip:true},  dpp4:{score:-7.2,hb:6,vdw:-18.5,elec:-6.8,lip:true} },
+};
+
+function scoreClass(s){
+  if(s<=-8) return 'good';
+  if(s<=-5.5) return 'ok';
+  return 'bad';
+}
+function scoreLabel(s){
+  if(s<=-8) return '✅ Strong';
+  if(s<=-5.5) return '⚠️ Moderate';
+  return '❌ Weak';
+}
+function pct(s){ return Math.min(100, Math.max(0, (-s/12)*100)).toFixed(0); }
+
+function runDocking(){
+  const btn = document.getElementById('dock-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Running...';
+
+  setTimeout(()=>{
+    const lig = document.getElementById('ligand-select').value;
+    const rec = document.getElementById('receptor-select').value;
+    const d = dockingData[lig][rec];
+    const sc = scoreClass(d.score);
+    const pctVal = pct(d.score);
+    const colors = {good:'#10b981',ok:'#f59e0b',bad:'#f87171'};
+
+    document.getElementById('dock-metrics').innerHTML = `
+      <div class="metric-row">
+        <span class="metric-label">Binding Free Energy (ΔG)</span>
+        <span class="metric-value ${sc}">${d.score} kcal/mol — ${scoreLabel(d.score)}</span>
+      </div>
+      <div class="score-bar-wrap">
+        <div class="score-bar-bg">
+          <div class="score-bar-fill" style="width:0;background:${colors[sc]}" data-w="${pctVal}"></div>
+        </div>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Hydrogen Bonds Formed</span>
+        <span class="metric-value" style="color:var(--accent)">${d.hb}</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Van der Waals Interaction</span>
+        <span class="metric-value" style="color:var(--accent2)">${d.vdw} kcal/mol</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Electrostatic Energy</span>
+        <span class="metric-value" style="color:var(--accent3)">${d.elec} kcal/mol</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Lipinski Rule of Five</span>
+        <span class="metric-value ${d.lip?'good':'bad'}">${d.lip?'✅ PASS':'❌ FAIL (may have bioavailability issues)'}</span>
+      </div>
+      <div style="margin-top:1rem;padding:0.8rem 1rem;background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);border-radius:8px;font-size:0.8rem;color:var(--muted);line-height:1.6;">
+        <b style="color:var(--text)">Interpretation:</b> A ΔG of <b>${d.score} kcal/mol</b> indicates 
+        ${d.score<=-8?'strong, promising binding — worth advancing to ADMET analysis.':d.score<=-5.5?'moderate binding — may be optimized with structural modifications.':'weak binding — this molecule is unlikely to inhibit this target effectively.'}
+      </div>
+    `;
+
+    const panel = document.getElementById('dock-result');
+    panel.classList.add('show');
+    // animate bar
+    setTimeout(()=>{
+      const bar = panel.querySelector('.score-bar-fill');
+      if(bar) bar.style.width = bar.dataset.w + '%';
+    },100);
+
+    btn.disabled = false;
+    btn.innerHTML = '▶ Run Docking';
+  }, 1400);
+}
+
+// ═══════════════════════════════════════
+// ADMET via Claude API
+// ═══════════════════════════════════════
+async function runADMET(){
+  const mol = document.getElementById('admet-input').value.trim();
+  if(!mol) return;
+  const btn = document.getElementById('admet-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Predicting...';
+
+  const result = document.getElementById('admet-result');
+  result.classList.add('show');
+  document.getElementById('admet-cards').innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:0.5rem 0">⏳ Analyzing molecule...</div>';
+  document.getElementById('admet-summary').textContent = '';
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        system: `You are a computational chemistry ADMET prediction engine. 
+When given a molecule name, respond ONLY with a valid JSON object (no markdown, no backticks, no extra text).
+Format:
+{
+  "found": true,
+  "molecule": "full name",
+  "formula": "molecular formula",
+  "mw": "molecular weight in Da",
+  "properties": [
+    {"icon":"🫀","name":"ABSORPTION","value":"High/Medium/Low","status":"good/ok/bad"},
+    {"icon":"🩸","name":"DISTRIBUTION","value":"e.g. Vd=0.15 L/kg","status":"good/ok/bad"},
+    {"icon":"⚙️","name":"METABOLISM","value":"e.g. CYP2C9 substrate","status":"good/ok/bad"},
+    {"icon":"🚽","name":"EXCRETION","value":"e.g. t½=2.5h, renal","status":"good/ok/bad"},
+    {"icon":"☠️","name":"TOXICITY","value":"e.g. Low (LD50>2000)","status":"good/ok/bad"},
+    {"icon":"💧","name":"SOLUBILITY","value":"e.g. 3.2 mg/mL","status":"good/ok/bad"},
+    {"icon":"🧬","name":"BIOAVAILABILITY","value":"e.g. ~68%","status":"good/ok/bad"},
+    {"icon":"📏","name":"LIPINSKI Ro5","value":"Pass/Fail","status":"good/bad"}
+  ],
+  "summary": "2-3 sentence drug-likeness summary including key strengths/weaknesses"
+}
+If molecule is unknown, return {"found":false}.`,
+        messages:[{role:'user',content:`ADMET prediction for: ${mol}`}]
+      })
+    });
+    const data = await resp.json();
+    const text = data.content.map(i=>i.text||'').join('');
+    let parsed;
+    try { parsed = JSON.parse(text.replace(/```json|```/g,'').trim()); }
+    catch(e){ throw new Error('Parse error'); }
+
+    if(!parsed.found){
+      document.getElementById('admet-cards').innerHTML=`<div style="color:var(--warn);font-size:0.85rem;padding:0.5rem 0">⚠ Molecule not recognized. Try a common drug name like "Aspirin" or "Metformin".</div>`;
+    } else {
+      const colorMap = {good:'var(--accent3)',ok:'var(--warn)',bad:'#f87171'};
+      document.getElementById('admet-cards').innerHTML = parsed.properties.map(p=>`
+        <div class="admet-card">
+          <div class="admet-icon">${p.icon}</div>
+          <div class="admet-name">${p.name}</div>
+          <div class="admet-val" style="color:${colorMap[p.status]||'var(--text)'}">${p.value}</div>
+        </div>`).join('');
+      document.getElementById('admet-summary').innerHTML=`
+        <b style="color:var(--text)">${parsed.molecule}</b> &nbsp;·&nbsp; <span style="font-family:var(--mono);color:var(--accent)">${parsed.formula}</span> &nbsp;·&nbsp; MW: ${parsed.mw}<br/><br/>${parsed.summary}`;
+    }
+  } catch(err){
+    document.getElementById('admet-cards').innerHTML=`<div style="color:#f87171;font-size:0.85rem;">Error contacting AI. Please check your API key setup.</div>`;
+  }
+  btn.disabled=false;
+  btn.innerHTML='🔍 Predict ADMET';
+}
+
+// ═══════════════════════════════════════
+// AI CHAT
+// ═══════════════════════════════════════
+let chatHistory = [];
+
+function addMsg(role, text){
+  const wrap = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className='msg';
+  const isAI = role==='assistant';
+  div.innerHTML=`
+    <div class="msg-avatar ${isAI?'ai':'user'}">${isAI?'AI':'U'}</div>
+    <div class="msg-bubble ${isAI?'ai-bubble':''}">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+  `;
+  wrap.appendChild(div);
+  wrap.scrollTop=wrap.scrollHeight;
+  return div;
+}
+
+function addTyping(){
+  const wrap = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className='msg'; div.id='typing-indicator';
+  div.innerHTML=`<div class="msg-avatar ai">AI</div><div class="msg-bubble ai-bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop=wrap.scrollHeight;
+}
+
+async function sendChat(){
+  const inp = document.getElementById('chat-input');
+  const text = inp.value.trim();
+  if(!text) return;
+  inp.value=''; inp.style.height='auto';
+  const btn = document.getElementById('chat-btn');
+  btn.disabled=true;
+
+  addMsg('user',text);
+  chatHistory.push({role:'user',content:text});
+  addTyping();
+
+  try{
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        system:`You are an expert computational chemistry and drug design assistant helping a first-year chemistry student learn about in silico drug design. 
+Topics you cover: molecular docking, AutoDock Vina, scoring functions, ADMET prediction, virtual screening, Lipinski's Rule of Five, SMILES notation, protein-ligand interactions, pharmacokinetics, AI/ML in drug discovery, AlphaFold, graph neural networks.
+Keep answers educational, clear, and appropriately detailed for a university student. Use emojis sparingly. Be encouraging.`,
+        messages:chatHistory
+      })
+    });
+    const data=await resp.json();
+    const reply=data.content.map(i=>i.text||'').join('');
+    document.getElementById('typing-indicator')?.remove();
+    addMsg('assistant',reply);
+    chatHistory.push({role:'assistant',content:reply});
+  } catch(err){
+    document.getElementById('typing-indicator')?.remove();
+    addMsg('assistant','Sorry, I encountered an error connecting to the AI. Please try again.');
+  }
+  btn.disabled=false;
+}
+</script>
+</body>
+</html>
